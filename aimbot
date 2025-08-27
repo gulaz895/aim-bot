@@ -1,0 +1,70 @@
+-- Aimbot + GUI + ระบบเลือดใต้ดิน
+local player = game.Players.LocalPlayer
+local cam = workspace.CurrentCamera
+local rs = game:GetService("RunService")
+
+local hum = player.Character:WaitForChild("Humanoid")
+local hrp = player.Character:WaitForChild("HumanoidRootPart")
+
+-- สร้าง GUI
+local screenGui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
+local toggleBtn = Instance.new("TextButton", screenGui)
+toggleBtn.Size = UDim2.new(0, 100, 0, 50)
+toggleBtn.Position = UDim2.new(0, 20, 0, 20)
+toggleBtn.Text = "Aimbot: OFF"
+
+-- ตัวแปรควบคุม
+local aimbotOn = false
+local lastPos = nil
+local origWalkSpeed = hum.WalkSpeed
+local origJumpPower = hum.JumpPower
+
+-- ปุ่ม GUI เปิด/ปิด Aimbot
+toggleBtn.MouseButton1Click:Connect(function()
+	aimbotOn = not aimbotOn
+	toggleBtn.Text = aimbotOn and "Aimbot: ON" or "Aimbot: OFF"
+end)
+
+-- ระบบเลือด: ลงใต้ดินและหยุดค้าง
+hum.HealthChanged:Connect(function(hp)
+	if hp <= 5 then
+		lastPos = hrp.Position
+		hrp.CFrame = hrp.CFrame - Vector3.new(0, 60, 0)
+		hum.WalkSpeed = 0
+		hum.JumpPower = 0
+	elseif hp >= 51 and lastPos then
+		hrp.CFrame = CFrame.new(lastPos)
+		lastPos = nil
+		hum.WalkSpeed = origWalkSpeed
+		hum.JumpPower = origJumpPower
+	end
+end)
+
+-- ฟังก์ชันหาเป้าหมายใกล้สุด (1–60 studs, ไม่ข้ามกำแพง)
+local function getTarget()
+	local closest, shortestDist = nil, math.huge
+	for _, v in pairs(workspace:GetChildren()) do
+		if v:FindFirstChild("Humanoid") and v:FindFirstChild("HumanoidRootPart") and v.Name ~= player.Name then
+			local dist = (v.HumanoidRootPart.Position - hrp.Position).Magnitude
+			if dist >= 1 and dist <= 60 then
+				local ray = Ray.new(hrp.Position, v.HumanoidRootPart.Position - hrp.Position)
+				local hit = workspace:FindPartOnRayWithIgnoreList(ray, {player.Character})
+				if hit and hit:IsDescendantOf(v) and dist < shortestDist then
+					shortestDist = dist
+					closest = v
+				end
+			end
+		end
+	end
+	return closest
+end
+
+-- อัปเดต Aimbot ทุกเฟรม
+rs.RenderStepped:Connect(function()
+	if aimbotOn then
+		local target = getTarget()
+		if target then
+			cam.CFrame = CFrame.new(cam.CFrame.Position, target.HumanoidRootPart.Position)
+		end
+	end
+end)
